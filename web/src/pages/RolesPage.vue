@@ -55,6 +55,17 @@
 
           <el-tabs v-model="activeTab">
             <el-tab-pane label="角色-菜单" name="menus">
+              <div class="toolbar" style="margin-top: 0">
+                <el-input
+                  v-model="menuKeyword"
+                  clearable
+                  placeholder="搜索菜单 name / code"
+                  style="width: 260px"
+                />
+                <el-button @click="expandAllMenus">展开</el-button>
+                <el-button @click="collapseAllMenus">折叠</el-button>
+                <span class="muted">已勾选 {{ checkedMenuCount }} 项</span>
+              </div>
               <el-tree
                 v-loading="loading"
                 ref="menuTreeRef"
@@ -62,6 +73,7 @@
                 node-key="id"
                 show-checkbox
                 default-expand-all
+                :filter-node-method="filterMenuNode"
                 :props="{ label: 'name', children: 'children' }"
               >
                 <template #default="{ data }">
@@ -72,6 +84,17 @@
             </el-tab-pane>
 
             <el-tab-pane label="角色-权限点" name="permissions">
+              <div class="toolbar" style="margin-top: 0">
+                <el-input
+                  v-model="permKeyword"
+                  clearable
+                  placeholder="搜索权限点 name / code"
+                  style="width: 260px"
+                />
+                <el-button @click="expandAllPerms">展开</el-button>
+                <el-button @click="collapseAllPerms">折叠</el-button>
+                <span class="muted">已勾选 {{ checkedPermCount }} 项</span>
+              </div>
               <el-tree
                 v-loading="loading"
                 ref="permTreeRef"
@@ -79,6 +102,7 @@
                 node-key="id"
                 show-checkbox
                 default-expand-all
+                :filter-node-method="filterPermNode"
                 :props="{ label: 'name', children: 'children' }"
               >
                 <template #default="{ data }">
@@ -116,7 +140,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import EditDialog from "../components/EditDialog.vue";
 import { buildTree } from "../utils/tree.js";
@@ -138,6 +162,54 @@ const activeTab = ref("menus");
 const menuTreeRef = ref(null);
 const permTreeRef = ref(null);
 
+const menuKeyword = ref("");
+const permKeyword = ref("");
+
+function filterMenuNode(value, data) {
+  if (!value) return true;
+  const v = String(value).toLowerCase();
+  return (
+    String(data.name || "").toLowerCase().includes(v) ||
+    String(data.code || "").toLowerCase().includes(v)
+  );
+}
+
+function filterPermNode(value, data) {
+  if (!value) return true;
+  const v = String(value).toLowerCase();
+  return (
+    String(data.name || "").toLowerCase().includes(v) ||
+    String(data.code || "").toLowerCase().includes(v)
+  );
+}
+
+watch(menuKeyword, (v) => {
+  menuTreeRef.value?.filter?.(v);
+});
+
+watch(permKeyword, (v) => {
+  permTreeRef.value?.filter?.(v);
+});
+
+function expandAllMenus() {
+  menuTreeRef.value?.setExpandedKeys?.(menus.value.map((x) => x.id));
+}
+
+function collapseAllMenus() {
+  menuTreeRef.value?.setExpandedKeys?.([]);
+}
+
+function expandAllPerms() {
+  permTreeRef.value?.setExpandedKeys?.(permissions.value.map((x) => x.id));
+}
+
+function collapseAllPerms() {
+  permTreeRef.value?.setExpandedKeys?.([]);
+}
+
+const checkedMenuCount = computed(() => (menuTreeRef.value?.getCheckedKeys(false) || []).length);
+const checkedPermCount = computed(() => (permTreeRef.value?.getCheckedKeys(false) || []).length);
+
 async function refreshAll() {
   loading.value = true;
   try {
@@ -154,6 +226,8 @@ async function refreshAll() {
       currentRole.value = still || null;
     }
     if (currentRole.value) await loadRoleBindings(currentRole.value.id);
+    expandAllMenus();
+    expandAllPerms();
   } catch (e) {
     ElMessage.error(e?.message || "加载失败");
   } finally {
@@ -265,4 +339,3 @@ async function removeRole(role) {
 
 refreshAll();
 </script>
-

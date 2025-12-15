@@ -1,10 +1,29 @@
 export function buildTree(rows, { idKey = "id", parentKey = "parentId" } = {}) {
   const byId = new Map(rows.map((r) => [r[idKey], { ...r, children: [] }]));
   const roots = [];
+  const createsCycle = (childId, parentId) => {
+    let cursor = parentId;
+    const seen = new Set();
+    while (cursor != null && byId.has(cursor)) {
+      if (cursor === childId) return true;
+      if (seen.has(cursor)) return true;
+      seen.add(cursor);
+      cursor = byId.get(cursor)[parentKey];
+    }
+    return false;
+  };
   for (const item of byId.values()) {
     const parentId = item[parentKey];
-    if (parentId && byId.has(parentId)) byId.get(parentId).children.push(item);
-    else roots.push(item);
+    if (
+      parentId &&
+      parentId !== item[idKey] &&
+      byId.has(parentId) &&
+      !createsCycle(item[idKey], parentId)
+    ) {
+      byId.get(parentId).children.push(item);
+    } else {
+      roots.push(item);
+    }
   }
   const sortRec = (nodes) => {
     nodes.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id);
@@ -25,4 +44,3 @@ export function collectIds(tree, idKey = "id") {
   walk(tree);
   return out;
 }
-

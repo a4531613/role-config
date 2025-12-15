@@ -32,6 +32,16 @@ router.post("/", parseBody(permissionCreateSchema), async (req, res) => {
   const db = await getDb();
   const b = req.validatedBody;
   try {
+    if (b.level === "class" && b.parentId != null) throw new Error("class permission must not have parentId");
+    if (b.level === "method") {
+      if (b.parentId == null) throw new Error("method permission must have parentId");
+      const parent = await db.get(
+        "SELECT id, level FROM permission WHERE id = ?",
+        b.parentId
+      );
+      if (!parent) throw new Error("Parent permission not found");
+      if (parent.level !== "class") throw new Error("method parent must be class level");
+    }
     const result = await db.run(
       `INSERT INTO permission (parent_id, level, name, code, description, sort, enabled, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
@@ -60,6 +70,17 @@ router.put("/:id", parseBody(permissionUpdateSchema), async (req, res) => {
 
   const current = await db.get("SELECT * FROM permission WHERE id = ?", id);
   if (!current) return fail(res, 404, "Permission not found");
+
+  const nextLevel = b.level ?? current.level;
+  const nextParentId = b.parentId ?? current.parent_id;
+  if (nextLevel === "class" && nextParentId != null) return fail(res, 400, "class permission must not have parentId");
+  if (nextLevel === "method") {
+    if (nextParentId == null) return fail(res, 400, "method permission must have parentId");
+    if (nextParentId === id) return fail(res, 400, "parentId cannot be self");
+    const parent = await db.get("SELECT id, level FROM permission WHERE id = ?", nextParentId);
+    if (!parent) return fail(res, 400, "Parent permission not found");
+    if (parent.level !== "class") return fail(res, 400, "method parent must be class level");
+  }
 
   const next = {
     parentId: b.parentId ?? current.parent_id,
@@ -106,4 +127,3 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
-
