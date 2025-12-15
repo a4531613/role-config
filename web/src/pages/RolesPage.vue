@@ -25,6 +25,7 @@
           <el-table-column v-if="bulkMode" type="selection" width="48" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="code" label="code" width="140" />
+          <el-table-column prop="owner" label="owner" width="120" />
           <el-table-column label="启用" width="70">
             <template #default="{ row }">
               <el-tag v-if="row.enabled" size="small">是</el-tag>
@@ -193,6 +194,9 @@
       :saving="savingRole"
       @save="saveRole"
     >
+      <el-form-item label="owner">
+        <el-input v-model="roleForm.owner" placeholder="如：张三/研发部/系统" />
+      </el-form-item>
       <el-form-item label="名称">
         <el-input v-model="roleForm.name" />
       </el-form-item>
@@ -479,6 +483,7 @@ const dialogOpen = ref(false);
 const roleEditingId = ref(null);
 const savingRole = ref(false);
 const roleForm = reactive({
+  owner: "",
   name: "",
   code: "",
   description: "",
@@ -488,13 +493,14 @@ const dialogTitle = computed(() => (roleEditingId.value ? "编辑角色" : "新�
 
 function openCreateRole() {
   roleEditingId.value = null;
-  Object.assign(roleForm, { name: "", code: "", description: "", enabled: 1 });
+  Object.assign(roleForm, { owner: "", name: "", code: "", description: "", enabled: 1 });
   dialogOpen.value = true;
 }
 
 function openEditRole(role) {
   roleEditingId.value = role.id;
   Object.assign(roleForm, {
+    owner: role.owner ?? "",
     name: role.name,
     code: role.code,
     description: role.description ?? "",
@@ -508,6 +514,7 @@ async function saveRole() {
   try {
     if (!roleForm.name || !roleForm.code) throw new Error("name/code 不能为空");
     const payload = {
+      owner: roleForm.owner || null,
       name: roleForm.name,
       code: roleForm.code,
       description: roleForm.description || null,

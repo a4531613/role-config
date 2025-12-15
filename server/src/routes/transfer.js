@@ -29,7 +29,7 @@ router.get("/export", async (req, res) => {
   );
 
   const roles = await db.all(
-    "SELECT id, name, code, description, enabled FROM role ORDER BY id ASC"
+    "SELECT id, name, code, owner, description, enabled FROM role ORDER BY id ASC"
   );
 
   const roleMenus = await db.all(
@@ -94,6 +94,7 @@ const importSchema = z.object({
     z.object({
       code: z.string().min(1),
       name: z.string().min(1),
+      owner: z.string().min(1).nullable().optional(),
       description: z.string().nullable().optional(),
       enabled: z.number().int().optional(),
     })
@@ -199,21 +200,22 @@ router.post(
           }
         }
 
-        if (p.roles?.length) {
-          for (const r of p.roles) {
-            await db.run(
-              `INSERT INTO role (name, code, description, enabled, updated_at)
-               VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-               ON CONFLICT(code) DO UPDATE SET
-                 name=excluded.name, description=excluded.description, enabled=excluded.enabled,
-                 updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
-              r.name,
-              r.code,
-              r.description ?? null,
-              r.enabled ?? 1
-            );
-          }
+      if (p.roles?.length) {
+        for (const r of p.roles) {
+          await db.run(
+            `INSERT INTO role (name, code, owner, description, enabled, updated_at)
+             VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+             ON CONFLICT(code) DO UPDATE SET
+               name=excluded.name, owner=excluded.owner, description=excluded.description, enabled=excluded.enabled,
+               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+            r.name,
+            r.code,
+            r.owner ?? null,
+            r.description ?? null,
+            r.enabled ?? 1
+          );
         }
+      }
 
         const roleMap = new Map(
           (await db.all("SELECT id, code FROM role")).map((r) => [r.code, r.id])

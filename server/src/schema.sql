@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS role (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   code TEXT NOT NULL UNIQUE,
+  owner TEXT NULL,
   description TEXT NULL,
   enabled INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -60,4 +61,3 @@ CREATE TABLE IF NOT EXISTS role_permission (
 
 CREATE INDEX IF NOT EXISTS idx_role_permission_role_id ON role_permission(role_id);
 CREATE INDEX IF NOT EXISTS idx_role_permission_permission_id ON role_permission(permission_id);
-

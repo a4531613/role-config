@@ -17,6 +17,17 @@ async function migrate(db) {
   await db.exec(schemaSql);
 }
 
+async function addColumnIfMissing(db, table, column, columnDef) {
+  const cols = await db.all(`PRAGMA table_info(${table})`);
+  const names = new Set(cols.map((c) => c.name));
+  if (names.has(column)) return;
+  await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${columnDef}`);
+}
+
+async function migrateLegacy(db) {
+  await addColumnIfMissing(db, "role", "owner", "TEXT NULL");
+}
+
 async function assertTableColumns(db, table, requiredColumns) {
   const cols = await db.all(`PRAGMA table_info(${table})`);
   const names = new Set(cols.map((c) => c.name));
@@ -41,7 +52,7 @@ async function validateSchema(db) {
     "sort",
     "enabled",
   ]);
-  await assertTableColumns(db, "role", ["id", "name", "code", "enabled"]);
+  await assertTableColumns(db, "role", ["id", "name", "code", "owner", "enabled"]);
   await assertTableColumns(db, "role_menu", ["role_id", "menu_id"]);
   await assertTableColumns(db, "role_permission", ["role_id", "permission_id"]);
 }
@@ -57,6 +68,7 @@ export async function getDb() {
     });
     await db.exec("PRAGMA foreign_keys = ON;");
     await migrate(db);
+    await migrateLegacy(db);
     await validateSchema(db);
     return db;
   })();

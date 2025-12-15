@@ -10,6 +10,7 @@ const router = express.Router();
 const roleCreateSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(1),
+  owner: z.string().min(1).nullable().optional(),
   description: z.string().nullable().optional(),
   enabled: z.coerce.number().int().optional().default(1),
 });
@@ -19,7 +20,7 @@ const roleUpdateSchema = roleCreateSchema.partial();
 router.get("/", async (req, res) => {
   const db = await getDb();
   const rows = await db.all(
-    "SELECT id, name, code, description, enabled, created_at as createdAt, updated_at as updatedAt FROM role ORDER BY id DESC"
+    "SELECT id, name, code, owner, description, enabled, created_at as createdAt, updated_at as updatedAt FROM role ORDER BY id DESC"
   );
   ok(res, rows);
 });
@@ -29,15 +30,16 @@ router.post("/", parseBody(roleCreateSchema), async (req, res) => {
   const b = req.validatedBody;
   try {
     const result = await db.run(
-      `INSERT INTO role (name, code, description, enabled, updated_at)
-       VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+      `INSERT INTO role (name, code, owner, description, enabled, updated_at)
+       VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
       b.name,
       b.code,
+      b.owner ?? null,
       b.description ?? null,
       b.enabled ?? 1
     );
     const created = await db.get(
-      "SELECT id, name, code, description, enabled, created_at as createdAt, updated_at as updatedAt FROM role WHERE id = ?",
+      "SELECT id, name, code, owner, description, enabled, created_at as createdAt, updated_at as updatedAt FROM role WHERE id = ?",
       result.lastID
     );
     ok(res, created);
@@ -57,6 +59,7 @@ router.put("/:id", parseBody(roleUpdateSchema), async (req, res) => {
   const next = {
     name: b.name ?? current.name,
     code: b.code ?? current.code,
+    owner: b.owner === undefined ? current.owner : b.owner,
     description: b.description === undefined ? current.description : b.description,
     enabled: b.enabled ?? current.enabled,
   };
@@ -64,17 +67,18 @@ router.put("/:id", parseBody(roleUpdateSchema), async (req, res) => {
   try {
     await db.run(
       `UPDATE role
-       SET name = ?, code = ?, description = ?, enabled = ?,
+       SET name = ?, code = ?, owner = ?, description = ?, enabled = ?,
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
        WHERE id = ?`,
       next.name,
       next.code,
+      next.owner ?? null,
       next.description ?? null,
       next.enabled,
       id
     );
     const updated = await db.get(
-      "SELECT id, name, code, description, enabled, created_at as createdAt, updated_at as updatedAt FROM role WHERE id = ?",
+      "SELECT id, name, code, owner, description, enabled, created_at as createdAt, updated_at as updatedAt FROM role WHERE id = ?",
       id
     );
     ok(res, updated);
