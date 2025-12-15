@@ -1,0 +1,80 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.page-header__title {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.page-header__desc {
+  margin-top: var(--sp-1);
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Tree table (header + rows inside el-tree node content) */
+.tree-table-head,
+.tree-table-row {
+  display: grid;
+  gap: var(--sp-2);
+  align-items: center;
+  grid-template-columns: var(--col-name, 1fr) var(--col-2, 160px) var(--col-3, 220px) var(--col-4, 80px)
+    var(--col-5, 90px) var(--col-actions, 240px);
+}
+
+.tree-table-head.is-7,
+.tree-table-row.is-7 {
+  grid-template-columns: var(--col-name, 1fr) var(--col-2, 160px) var(--col-3, 220px) var(--col-4, 80px)
+    var(--col-5, 90px) var(--col-6, 90px) var(--col-actions, 240px);
+}
+
+.tree-table-head.is-8,
+.tree-table-row.is-8 {
+  grid-template-columns: var(--col-name, 1fr) var(--col-2, 160px) var(--col-3, 220px) var(--col-4, 220px)
+    var(--col-5, 80px) var(--col-6, 90px) var(--col-7, 90px) var(--col-actions, 240px);
+}
+
+.tree-table-head {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  background: var(--color-surface-2);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.tree-table-row {
+  width: 100%;
+  padding: 2px 0;
+}
+
+.tree-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}

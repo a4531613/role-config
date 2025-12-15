@@ -1,0 +1,57 @@
+.app-shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--aside-w) 1fr;
+}
+
+.app-aside {
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-brand {
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-brand__name {
+  font-weight: 650;
+}
+
+.app-brand__meta {
+  margin-top: var(--sp-1);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.app-menu {
+  padding: var(--sp-2);
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-header {
+  height: var(--header-h);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-4);
+}
+
+.app-header__title {
+  font-weight: 600;
+}
+
+.app-content {
+  padding: var(--sp-4);
+  overflow: auto;
+}
+

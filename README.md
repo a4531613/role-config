@@ -7,6 +7,9 @@
 - 角色维护：角色 CRUD
 - 绑定关系维护：角色-菜单、角色-权限点
 - 导入/导出：JSON（含父子关系与绑定关系）
+- UCD（以用户为中心设计）梳理：`docs/UCD.md`
+- 样式体系规范：`docs/STYLE.md`
+- 架构与可维护性约束：`docs/ARCH.md`
 
 ## 开发启动
 
@@ -38,6 +41,7 @@ SQLite 文件默认在 `server/data/app.db`（首次启动自动建表）。
 
 - `menus[]`：`{ code, parentCode?, name, path?, icon?, sort?, enabled? }`
 - `permissions[]`：`{ code, parentCode?, level: 'class'|'method', name, description?, sort?, enabled? }`
+- `permissions[]`：`{ code, parentCode?, level: 'class'|'method', name, path?, description?, sort?, enabled? }`
 - `roles[]`：`{ code, name, description?, enabled? }`
 - `roleMenus[]`：`{ roleCode, menuCode }`
 - `rolePermissions[]`：`{ roleCode, permissionCode }`

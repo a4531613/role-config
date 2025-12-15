@@ -1,26 +1,30 @@
 <template>
-  <el-container style="height: 100%">
-    <el-aside width="220px" style="border-right: 1px solid #eee">
-      <div style="padding: 14px 12px; font-weight: 600">role-config</div>
-      <el-menu :default-active="$route.path" router>
+  <div class="app-shell">
+    <aside class="app-aside">
+      <div class="app-brand">
+        <div class="app-brand__name">role-config</div>
+        <div class="app-brand__meta">菜单 / 权限点 / 角色</div>
+      </div>
+      <el-menu class="app-menu" :default-active="$route.path" router>
         <el-menu-item index="/menus">菜单维护</el-menu-item>
         <el-menu-item index="/permissions">权限点清单</el-menu-item>
         <el-menu-item index="/roles">角色维护</el-menu-item>
       </el-menu>
-    </el-aside>
-    <el-container>
-      <el-header style="display: flex; align-items: center; justify-content: space-between">
-        <div class="muted">Vue + SQLite</div>
-        <TransferButtons />
-      </el-header>
-      <el-main style="padding: 0">
+    </aside>
+    <main class="app-main">
+      <header class="app-header">
+        <div class="app-header__title">{{ $route.meta?.title || "role-config" }}</div>
+        <div class="app-header__actions">
+          <TransferButtons />
+        </div>
+      </header>
+      <div class="app-content">
         <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+      </div>
+    </main>
+  </div>
 </template>
 
 <script setup>
 import TransferButtons from "./components/TransferButtons.vue";
 </script>
-

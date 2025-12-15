@@ -1,27 +1,32 @@
 <template>
   <div class="page">
-    <div class="toolbar">
+    <PageHeader
+      title="权限点清单"
+      description="维护权限点清单：class（资源/类）→ method（动作/接口）。method 必须挂在 class 下。"
+    >
       <el-button type="primary" @click="openCreateClass">新增类级权限点</el-button>
       <el-button @click="refresh" :loading="loading">刷新</el-button>
-      <el-input
-        v-model="keyword"
-        clearable
-        placeholder="搜索 name / code / description"
-        style="width: 280px"
-      />
+    </PageHeader>
+
+    <div class="toolbar">
+      <el-input v-model="keyword" clearable placeholder="搜索 name / code / description" style="width: 280px" />
       <el-button @click="expandAll">展开</el-button>
       <el-button @click="collapseAll">折叠</el-button>
-      <span class="muted">共 {{ rows.length }} 项（class → method）</span>
+      <span class="muted">共 {{ rows.length }} 项</span>
     </div>
 
-    <div class="tree-head">
-      <div class="c-name">名称</div>
-      <div class="c-level">level</div>
-      <div class="c-code">code</div>
-      <div class="c-desc">描述</div>
-      <div class="c-sort">sort</div>
-      <div class="c-enabled">启用</div>
-      <div class="c-actions">操作</div>
+    <div
+      class="tree-table-head is-8"
+      style="--col-2: 90px; --col-3: 180px; --col-4: 220px; --col-5: 80px; --col-6: 90px; --col-7: 90px; --col-actions: 240px"
+    >
+      <div>名称</div>
+      <div>level</div>
+      <div>code</div>
+      <div>path</div>
+      <div>描述</div>
+      <div>sort</div>
+      <div>启用</div>
+      <div style="text-align: right">操作</div>
     </div>
 
     <el-tree
@@ -35,28 +40,26 @@
       :props="{ label: 'name', children: 'children' }"
     >
       <template #default="{ node, data }">
-        <div class="tree-row">
-          <div class="c-name">
+        <div
+          class="tree-table-row is-8"
+          style="--col-2: 90px; --col-3: 180px; --col-4: 220px; --col-5: 80px; --col-6: 90px; --col-7: 90px; --col-actions: 240px"
+        >
+          <div>
             <span :style="{ paddingLeft: `${(node.level - 1) * 16}px` }">{{ data.name }}</span>
           </div>
-          <div class="c-level">
+          <div>
             <el-tag v-if="data.level === 'class'" size="small">class</el-tag>
             <el-tag v-else type="success" size="small">method</el-tag>
           </div>
-          <div class="c-code">
-            <span class="muted">{{ data.code }}</span>
-          </div>
-          <div class="c-desc">
-            <span class="muted">{{ data.description || "-" }}</span>
-          </div>
-          <div class="c-sort">
-            <span class="muted">{{ data.sort ?? 0 }}</span>
-          </div>
-          <div class="c-enabled">
+          <div class="muted">{{ data.code }}</div>
+          <div class="muted">{{ data.path || "-" }}</div>
+          <div class="muted">{{ data.description || "-" }}</div>
+          <div class="muted">{{ data.sort ?? 0 }}</div>
+          <div>
             <el-tag v-if="data.enabled" size="small">是</el-tag>
             <el-tag v-else type="info" size="small">否</el-tag>
           </div>
-          <div class="c-actions">
+          <div class="tree-table-actions">
             <el-button
               v-if="data.level === 'class'"
               size="small"
@@ -102,6 +105,9 @@
           style="width: 100%"
         />
       </el-form-item>
+      <el-form-item label="path(方法)">
+        <el-input v-model="form.path" :disabled="form.level !== 'method'" placeholder="/api/users/list" />
+      </el-form-item>
       <el-form-item label="名称">
         <el-input v-model="form.name" />
       </el-form-item>
@@ -125,7 +131,10 @@
 import { computed, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import EditDialog from "../components/EditDialog.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { buildTree } from "../utils/tree.js";
+import { useTreeSearch } from "../composables/useTreeSearch.js";
+import { useDataChanged } from "../composables/useDataChanged.js";
 import { delJson, getJson, postJson, putJson } from "../api.js";
 
 const loading = ref(false);
@@ -134,30 +143,19 @@ const rows = ref([]);
 
 const treeData = ref([]);
 const treeRef = ref(null);
-const keyword = ref("");
-
-function filterNode(value, data) {
-  if (!value) return true;
-  const v = String(value).toLowerCase();
-  return (
-    String(data.name || "").toLowerCase().includes(v) ||
-    String(data.code || "").toLowerCase().includes(v) ||
-    String(data.description || "").toLowerCase().includes(v)
-  );
-}
-
-watch(keyword, (v) => {
-  treeRef.value?.filter?.(v);
+const { keyword, filterNode, expandAll, collapseAll } = useTreeSearch({
+  treeRef,
+  getAllKeys: () => rows.value.map((x) => x.id),
+  filterNode: (value, data) => {
+    if (!value) return true;
+    const v = String(value).toLowerCase();
+    return (
+      String(data.name || "").toLowerCase().includes(v) ||
+      String(data.code || "").toLowerCase().includes(v) ||
+      String(data.description || "").toLowerCase().includes(v)
+    );
+  },
 });
-
-function expandAll() {
-  const allIds = rows.value.map((x) => x.id);
-  treeRef.value?.setExpandedKeys?.(allIds);
-}
-
-function collapseAll() {
-  treeRef.value?.setExpandedKeys?.([]);
-}
 
 const classOptions = computed(() => buildTree(rows.value.filter((r) => r.level === "class")));
 
@@ -182,6 +180,7 @@ const form = reactive({
   level: "class",
   name: "",
   code: "",
+  path: "",
   description: "",
   sort: 0,
   enabled: 1,
@@ -192,7 +191,10 @@ const dialogTitle = computed(() => (editingId.value ? "编辑权限点" : "新�
 watch(
   () => form.level,
   (lvl) => {
-    if (lvl === "class") form.parentId = null;
+    if (lvl === "class") {
+      form.parentId = null;
+      form.path = "";
+    }
   }
 );
 
@@ -204,6 +206,7 @@ function openCreateClass() {
     level: "class",
     name: "",
     code: "",
+    path: "",
     description: "",
     sort: 0,
     enabled: 1,
@@ -219,6 +222,7 @@ function openCreateMethod(classId) {
     level: "method",
     name: "",
     code: "",
+    path: "",
     description: "",
     sort: 0,
     enabled: 1,
@@ -234,6 +238,7 @@ function openEdit(row) {
     level: row.level,
     name: row.name,
     code: row.code,
+    path: row.path ?? "",
     description: row.description ?? "",
     sort: row.sort ?? 0,
     enabled: row.enabled ?? 1,
@@ -249,6 +254,7 @@ async function save() {
       level: form.level,
       name: form.name,
       code: form.code,
+      path: form.level === "method" ? form.path || null : null,
       description: form.description || null,
       sort: form.sort ?? 0,
       enabled: form.enabled ?? 1,
@@ -279,53 +285,5 @@ async function remove(row) {
 }
 
 refresh();
+useDataChanged(refresh);
 </script>
-
-<style scoped>
-.tree-head,
-.tree-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.tree-head {
-  padding: 8px 10px;
-  border: 1px solid #eee;
-  border-bottom: 0;
-  background: #fafafa;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
-}
-
-.tree-row {
-  width: 100%;
-  padding: 4px 0;
-}
-
-.c-name {
-  flex: 1;
-  min-width: 140px;
-}
-.c-level {
-  width: 90px;
-}
-.c-code {
-  width: 180px;
-}
-.c-desc {
-  width: 220px;
-}
-.c-sort {
-  width: 80px;
-}
-.c-enabled {
-  width: 80px;
-}
-.c-actions {
-  width: 220px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-</style>

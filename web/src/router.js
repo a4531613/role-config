@@ -7,9 +7,8 @@ export default createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", redirect: "/menus" },
-    { path: "/menus", component: MenusPage },
-    { path: "/permissions", component: PermissionsPage },
-    { path: "/roles", component: RolesPage },
+    { path: "/menus", component: MenusPage, meta: { title: "菜单维护" } },
+    { path: "/permissions", component: PermissionsPage, meta: { title: "权限点清单" } },
+    { path: "/roles", component: RolesPage, meta: { title: "角色维护" } },
   ],
 });
-

@@ -218,6 +218,8 @@ import { computed, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import EditDialog from "../components/EditDialog.vue";
 import { buildTree } from "../utils/tree.js";
+import { useTreeSearch } from "../composables/useTreeSearch.js";
+import { useDataChanged } from "../composables/useDataChanged.js";
 import { delJson, getJson, postJson, putJson } from "../api.js";
 
 const loading = ref(false);
@@ -244,50 +246,41 @@ const bulkPermAction = ref("bind");
 const bulkLoadingMenus = ref(false);
 const bulkLoadingPerms = ref(false);
 
-const menuKeyword = ref("");
-const permKeyword = ref("");
-
-function filterMenuNode(value, data) {
-  if (!value) return true;
-  const v = String(value).toLowerCase();
-  return (
-    String(data.name || "").toLowerCase().includes(v) ||
-    String(data.code || "").toLowerCase().includes(v)
-  );
-}
-
-function filterPermNode(value, data) {
-  if (!value) return true;
-  const v = String(value).toLowerCase();
-  return (
-    String(data.name || "").toLowerCase().includes(v) ||
-    String(data.code || "").toLowerCase().includes(v)
-  );
-}
-
-watch(menuKeyword, (v) => {
-  menuTreeRef.value?.filter?.(v);
+const {
+  keyword: menuKeyword,
+  filterNode: filterMenuNode,
+  expandAll: expandAllMenus,
+  collapseAll: collapseAllMenus,
+} = useTreeSearch({
+  treeRef: menuTreeRef,
+  getAllKeys: () => menus.value.map((x) => x.id),
+  filterNode: (value, data) => {
+    if (!value) return true;
+    const v = String(value).toLowerCase();
+    return (
+      String(data.name || "").toLowerCase().includes(v) ||
+      String(data.code || "").toLowerCase().includes(v)
+    );
+  },
 });
 
-watch(permKeyword, (v) => {
-  permTreeRef.value?.filter?.(v);
+const {
+  keyword: permKeyword,
+  filterNode: filterPermNode,
+  expandAll: expandAllPerms,
+  collapseAll: collapseAllPerms,
+} = useTreeSearch({
+  treeRef: permTreeRef,
+  getAllKeys: () => permissions.value.map((x) => x.id),
+  filterNode: (value, data) => {
+    if (!value) return true;
+    const v = String(value).toLowerCase();
+    return (
+      String(data.name || "").toLowerCase().includes(v) ||
+      String(data.code || "").toLowerCase().includes(v)
+    );
+  },
 });
-
-function expandAllMenus() {
-  menuTreeRef.value?.setExpandedKeys?.(menus.value.map((x) => x.id));
-}
-
-function collapseAllMenus() {
-  menuTreeRef.value?.setExpandedKeys?.([]);
-}
-
-function expandAllPerms() {
-  permTreeRef.value?.setExpandedKeys?.(permissions.value.map((x) => x.id));
-}
-
-function collapseAllPerms() {
-  permTreeRef.value?.setExpandedKeys?.([]);
-}
 
 const checkedMenuCount = computed(() => (menuTreeRef.value?.getCheckedKeys(false) || []).length);
 const checkedPermCount = computed(() => (permTreeRef.value?.getCheckedKeys(false) || []).length);
@@ -544,4 +537,5 @@ async function removeRole(role) {
 }
 
 refreshAll();
+useDataChanged(refreshAll);
 </script>

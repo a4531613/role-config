@@ -15,6 +15,7 @@
 <script setup>
 import { ElMessage } from "element-plus";
 import { http } from "../api.js";
+import { emitDataChanged } from "../events.js";
 
 async function onExport() {
   const base = http.defaults.baseURL || "";
@@ -30,10 +31,9 @@ async function onFileChange(file) {
     });
     if (!res.data?.ok) throw new Error(res.data?.message || "Import failed");
     ElMessage.success("导入成功");
-    window.location.reload();
+    emitDataChanged();
   } catch (e) {
     ElMessage.error(e?.message || "导入失败");
   }
 }
 </script>
-

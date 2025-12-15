@@ -26,6 +26,7 @@ async function addColumnIfMissing(db, table, column, columnDef) {
 
 async function migrateLegacy(db) {
   await addColumnIfMissing(db, "role", "owner", "TEXT NULL");
+  await addColumnIfMissing(db, "permission", "path", "TEXT NULL");
 }
 
 async function assertTableColumns(db, table, requiredColumns) {
@@ -49,6 +50,7 @@ async function validateSchema(db) {
     "level",
     "name",
     "code",
+    "path",
     "sort",
     "enabled",
   ]);

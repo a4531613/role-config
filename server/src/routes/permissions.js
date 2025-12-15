@@ -11,6 +11,7 @@ const permissionCreateSchema = z.object({
   level: z.enum(["class", "method"]),
   name: z.string().min(1),
   code: z.string().min(1),
+  path: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   sort: z.coerce.number().int().optional().default(0),
   enabled: z.coerce.number().int().optional().default(1),
@@ -23,7 +24,7 @@ const permissionUpdateSchema = permissionCreateSchema.partial().extend({
 router.get("/", async (req, res) => {
   const db = await getDb();
   const rows = await db.all(
-    "SELECT id, parent_id as parentId, level, name, code, description, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM permission ORDER BY sort ASC, id ASC"
+    "SELECT id, parent_id as parentId, level, name, code, path, description, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM permission ORDER BY sort ASC, id ASC"
   );
   ok(res, rows);
 });
@@ -43,18 +44,19 @@ router.post("/", parseBody(permissionCreateSchema), async (req, res) => {
       if (parent.level !== "class") throw new Error("method parent must be class level");
     }
     const result = await db.run(
-      `INSERT INTO permission (parent_id, level, name, code, description, sort, enabled, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+      `INSERT INTO permission (parent_id, level, name, code, path, description, sort, enabled, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
       b.parentId ?? null,
       b.level,
       b.name,
       b.code,
+      b.path ?? null,
       b.description ?? null,
       b.sort ?? 0,
       b.enabled ?? 1
     );
     const created = await db.get(
-      "SELECT id, parent_id as parentId, level, name, code, description, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM permission WHERE id = ?",
+      "SELECT id, parent_id as parentId, level, name, code, path, description, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM permission WHERE id = ?",
       result.lastID
     );
     ok(res, created);
@@ -87,6 +89,7 @@ router.put("/:id", parseBody(permissionUpdateSchema), async (req, res) => {
     level: b.level ?? current.level,
     name: b.name ?? current.name,
     code: b.code ?? current.code,
+    path: b.path === undefined ? current.path : b.path,
     description: b.description === undefined ? current.description : b.description,
     sort: b.sort ?? current.sort,
     enabled: b.enabled ?? current.enabled,
@@ -95,20 +98,21 @@ router.put("/:id", parseBody(permissionUpdateSchema), async (req, res) => {
   try {
     await db.run(
       `UPDATE permission
-       SET parent_id = ?, level = ?, name = ?, code = ?, description = ?, sort = ?, enabled = ?,
+       SET parent_id = ?, level = ?, name = ?, code = ?, path = ?, description = ?, sort = ?, enabled = ?,
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
        WHERE id = ?`,
       next.parentId ?? null,
       next.level,
       next.name,
       next.code,
+      next.path ?? null,
       next.description ?? null,
       next.sort,
       next.enabled,
       id
     );
     const updated = await db.get(
-      "SELECT id, parent_id as parentId, level, name, code, description, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM permission WHERE id = ?",
+      "SELECT id, parent_id as parentId, level, name, code, path, description, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM permission WHERE id = ?",
       id
     );
     ok(res, updated);

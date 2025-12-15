@@ -22,7 +22,7 @@ router.get("/export", async (req, res) => {
 
   const permissions = await db.all(
     `SELECT p.id, p.parent_id as parentId, pp.code as parentCode,
-            p.level, p.name, p.code, p.description, p.sort, p.enabled
+            p.level, p.name, p.code, p.path, p.description, p.sort, p.enabled
      FROM permission p
      LEFT JOIN permission pp ON pp.id = p.parent_id
      ORDER BY p.sort ASC, p.id ASC`
@@ -85,6 +85,7 @@ const importSchema = z.object({
       parentCode: z.string().min(1).nullable().optional(),
       level: z.enum(["class","method"]),
       name: z.string().min(1),
+      path: z.string().nullable().optional(),
       description: z.string().nullable().optional(),
       sort: z.number().int().optional(),
       enabled: z.number().int().optional(),
@@ -173,15 +174,16 @@ router.post(
         if (p.permissions?.length) {
           for (const perm of p.permissions) {
             await db.run(
-              `INSERT INTO permission (parent_id, level, name, code, description, sort, enabled, updated_at)
-               VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+              `INSERT INTO permission (parent_id, level, name, code, path, description, sort, enabled, updated_at)
+               VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
                ON CONFLICT(code) DO UPDATE SET
-                 level=excluded.level, name=excluded.name, description=excluded.description,
+                 level=excluded.level, name=excluded.name, path=excluded.path, description=excluded.description,
                  sort=excluded.sort, enabled=excluded.enabled,
                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
               perm.level,
               perm.name,
               perm.code,
+              perm.path ?? null,
               perm.description ?? null,
               perm.sort ?? 0,
               perm.enabled ?? 1

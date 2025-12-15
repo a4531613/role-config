@@ -1,0 +1,22 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: var(--font-family);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+#app {
+  height: 100%;
+}
+
+/* Element Plus subtle tweaks for enterprise admin feel */
+.el-menu {
+  border-right: none !important;
+}
+
+.el-card {
+  border-color: var(--color-border) !important;
+}
+

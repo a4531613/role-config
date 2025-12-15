@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS permission (
   level TEXT NOT NULL CHECK (level IN ('class','method')),
   name TEXT NOT NULL,
   code TEXT NOT NULL UNIQUE,
+  path TEXT NULL,
   description TEXT NULL,
   sort INTEGER NOT NULL DEFAULT 0,
   enabled INTEGER NOT NULL DEFAULT 1,
