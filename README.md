@@ -41,3 +41,14 @@ SQLite 文件默认在 `server/data/app.db`（首次启动自动建表）。
 - `roles[]`：`{ code, name, description?, enabled? }`
 - `roleMenus[]`：`{ roleCode, menuCode }`
 - `rolePermissions[]`：`{ roleCode, permissionCode }`
+
+## 批量绑定（可选）
+
+- 批量绑定/解绑菜单：`POST /api/roles/bulk/menus`
+- 批量绑定/解绑权限点：`POST /api/roles/bulk/permissions`
+
+请求体：
+
+- `roleIds: number[]`
+- `menuIds: number[]` 或 `permissionIds: number[]`
+- `action: 'bind' | 'unbind'`（绑定为增量 `INSERT OR IGNORE`；解绑为按集合删除）

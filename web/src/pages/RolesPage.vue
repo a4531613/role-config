@@ -5,6 +5,13 @@
         <div class="toolbar">
           <el-button type="primary" @click="openCreateRole">新增角色</el-button>
           <el-button @click="refreshAll" :loading="loading">刷新</el-button>
+          <el-switch
+            v-model="bulkMode"
+            inline-prompt
+            active-text="批量"
+            inactive-text="单个"
+          />
+          <span v-if="bulkMode" class="muted">已选 {{ selectedRoleIds.length }} 个角色</span>
         </div>
 
         <el-table
@@ -13,7 +20,9 @@
           row-key="id"
           highlight-current-row
           @current-change="selectRole"
+          @selection-change="onSelectionChange"
         >
+          <el-table-column v-if="bulkMode" type="selection" width="48" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="code" label="code" width="140" />
           <el-table-column label="启用" width="70">
@@ -37,8 +46,15 @@
 
       <el-col :span="15">
         <el-alert
-          v-if="!currentRole"
+          v-if="!bulkMode && !currentRole"
           title="请选择左侧角色后配置菜单/权限点绑定"
+          type="info"
+          show-icon
+        />
+
+        <el-alert
+          v-else-if="bulkMode && selectedRoleIds.length === 0"
+          title="批量模式：先在左侧勾选多个角色"
           type="info"
           show-icon
         />
@@ -46,11 +62,21 @@
         <template v-else>
           <div class="toolbar">
             <div style="font-weight: 600">
-              当前角色：{{ currentRole.name }}
-              <span class="muted">({{ currentRole.code }})</span>
+              <template v-if="!bulkMode">
+                当前角色：{{ currentRole.name }}
+                <span class="muted">({{ currentRole.code }})</span>
+              </template>
+              <template v-else>批量操作（{{ selectedRoleIds.length }} 个角色）</template>
             </div>
             <div style="flex: 1"></div>
-            <el-button :loading="saving" type="primary" @click="saveBindings">保存绑定</el-button>
+            <el-button
+              v-if="!bulkMode"
+              :loading="saving"
+              type="primary"
+              @click="saveBindings"
+            >
+              保存绑定
+            </el-button>
           </div>
 
           <el-tabs v-model="activeTab">
@@ -65,6 +91,24 @@
                 <el-button @click="expandAllMenus">展开</el-button>
                 <el-button @click="collapseAllMenus">折叠</el-button>
                 <span class="muted">已勾选 {{ checkedMenuCount }} 项</span>
+                <template v-if="bulkMode">
+                  <el-button
+                    :disabled="selectedRoleIds.length === 0 || checkedMenuCount === 0"
+                    :loading="bulkSaving"
+                    type="primary"
+                    @click="bulkBindMenus"
+                  >
+                    批量绑定
+                  </el-button>
+                  <el-button
+                    :disabled="selectedRoleIds.length === 0 || checkedMenuCount === 0"
+                    :loading="bulkSaving"
+                    type="danger"
+                    @click="bulkUnbindMenus"
+                  >
+                    批量解绑
+                  </el-button>
+                </template>
               </div>
               <el-tree
                 v-loading="loading"
@@ -94,6 +138,24 @@
                 <el-button @click="expandAllPerms">展开</el-button>
                 <el-button @click="collapseAllPerms">折叠</el-button>
                 <span class="muted">已勾选 {{ checkedPermCount }} 项</span>
+                <template v-if="bulkMode">
+                  <el-button
+                    :disabled="selectedRoleIds.length === 0 || checkedPermCount === 0"
+                    :loading="bulkSaving"
+                    type="primary"
+                    @click="bulkBindPerms"
+                  >
+                    批量绑定
+                  </el-button>
+                  <el-button
+                    :disabled="selectedRoleIds.length === 0 || checkedPermCount === 0"
+                    :loading="bulkSaving"
+                    type="danger"
+                    @click="bulkUnbindPerms"
+                  >
+                    批量解绑
+                  </el-button>
+                </template>
               </div>
               <el-tree
                 v-loading="loading"
@@ -148,6 +210,7 @@ import { delJson, getJson, postJson, putJson } from "../api.js";
 
 const loading = ref(false);
 const saving = ref(false);
+const bulkSaving = ref(false);
 
 const roles = ref([]);
 const menus = ref([]);
@@ -161,6 +224,9 @@ const activeTab = ref("menus");
 
 const menuTreeRef = ref(null);
 const permTreeRef = ref(null);
+
+const bulkMode = ref(false);
+const selectedRoleIds = ref([]);
 
 const menuKeyword = ref("");
 const permKeyword = ref("");
@@ -210,6 +276,20 @@ function collapseAllPerms() {
 const checkedMenuCount = computed(() => (menuTreeRef.value?.getCheckedKeys(false) || []).length);
 const checkedPermCount = computed(() => (permTreeRef.value?.getCheckedKeys(false) || []).length);
 
+function onSelectionChange(selection) {
+  selectedRoleIds.value = (selection || []).map((r) => r.id);
+}
+
+watch(bulkMode, (on) => {
+  if (on) {
+    currentRole.value = null;
+    menuTreeRef.value?.setCheckedKeys?.([], false);
+    permTreeRef.value?.setCheckedKeys?.([], false);
+  } else {
+    selectedRoleIds.value = [];
+  }
+});
+
 async function refreshAll() {
   loading.value = true;
   try {
@@ -245,6 +325,7 @@ async function loadRoleBindings(roleId) {
 }
 
 async function selectRole(row) {
+  if (bulkMode.value) return;
   currentRole.value = row || null;
   if (!currentRole.value) return;
   loading.value = true;
@@ -275,6 +356,45 @@ async function saveBindings() {
     saving.value = false;
   }
 }
+
+async function bulkApplyMenus(action) {
+  if (selectedRoleIds.value.length === 0) return;
+  const menuIds = menuTreeRef.value?.getCheckedKeys(false) || [];
+  if (menuIds.length === 0) return;
+  bulkSaving.value = true;
+  try {
+    const res = await postJson("/api/roles/bulk/menus", { roleIds: selectedRoleIds.value, menuIds, action });
+    ElMessage.success(action === "bind" ? `已批量绑定（新增 ${res.inserted}）` : `已批量解绑（删除 ${res.deleted}）`);
+  } catch (e) {
+    ElMessage.error(e?.message || "批量操作失败");
+  } finally {
+    bulkSaving.value = false;
+  }
+}
+
+async function bulkApplyPerms(action) {
+  if (selectedRoleIds.value.length === 0) return;
+  const permissionIds = permTreeRef.value?.getCheckedKeys(false) || [];
+  if (permissionIds.length === 0) return;
+  bulkSaving.value = true;
+  try {
+    const res = await postJson("/api/roles/bulk/permissions", {
+      roleIds: selectedRoleIds.value,
+      permissionIds,
+      action,
+    });
+    ElMessage.success(action === "bind" ? `已批量绑定（新增 ${res.inserted}）` : `已批量解绑（删除 ${res.deleted}）`);
+  } catch (e) {
+    ElMessage.error(e?.message || "批量操作失败");
+  } finally {
+    bulkSaving.value = false;
+  }
+}
+
+const bulkBindMenus = () => bulkApplyMenus("bind");
+const bulkUnbindMenus = () => bulkApplyMenus("unbind");
+const bulkBindPerms = () => bulkApplyPerms("bind");
+const bulkUnbindPerms = () => bulkApplyPerms("unbind");
 
 const dialogOpen = ref(false);
 const roleEditingId = ref(null);

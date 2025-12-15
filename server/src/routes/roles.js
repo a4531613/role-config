@@ -155,4 +155,100 @@ router.put(
   }
 );
 
+router.post(
+  "/bulk/menus",
+  parseBody(
+    z.object({
+      roleIds: z.array(z.coerce.number().int().positive()).min(1),
+      menuIds: z.array(z.coerce.number().int().positive()).min(1),
+      action: z.enum(["bind", "unbind"]),
+    })
+  ),
+  async (req, res) => {
+    const db = await getDb();
+    const { roleIds, menuIds, action } = req.validatedBody;
+
+    try {
+      const result = await withTransaction(db, async () => {
+        if (action === "bind") {
+          let inserted = 0;
+          for (const roleId of roleIds) {
+            for (const menuId of menuIds) {
+              const r = await db.run(
+                "INSERT OR IGNORE INTO role_menu (role_id, menu_id) VALUES (?, ?)",
+                roleId,
+                menuId
+              );
+              inserted += r.changes || 0;
+            }
+          }
+          return { action, roleIds, menuIds, inserted, deleted: 0 };
+        }
+
+        const rolePlaceholders = roleIds.map(() => "?").join(",");
+        const menuPlaceholders = menuIds.map(() => "?").join(",");
+        const r = await db.run(
+          `DELETE FROM role_menu
+           WHERE role_id IN (${rolePlaceholders}) AND menu_id IN (${menuPlaceholders})`,
+          ...roleIds,
+          ...menuIds
+        );
+        return { action, roleIds, menuIds, inserted: 0, deleted: r.changes || 0 };
+      });
+
+      ok(res, result);
+    } catch (e) {
+      fail(res, 400, e?.message || "Failed to bulk update role menus");
+    }
+  }
+);
+
+router.post(
+  "/bulk/permissions",
+  parseBody(
+    z.object({
+      roleIds: z.array(z.coerce.number().int().positive()).min(1),
+      permissionIds: z.array(z.coerce.number().int().positive()).min(1),
+      action: z.enum(["bind", "unbind"]),
+    })
+  ),
+  async (req, res) => {
+    const db = await getDb();
+    const { roleIds, permissionIds, action } = req.validatedBody;
+
+    try {
+      const result = await withTransaction(db, async () => {
+        if (action === "bind") {
+          let inserted = 0;
+          for (const roleId of roleIds) {
+            for (const permissionId of permissionIds) {
+              const r = await db.run(
+                "INSERT OR IGNORE INTO role_permission (role_id, permission_id) VALUES (?, ?)",
+                roleId,
+                permissionId
+              );
+              inserted += r.changes || 0;
+            }
+          }
+          return { action, roleIds, permissionIds, inserted, deleted: 0 };
+        }
+
+        const rolePlaceholders = roleIds.map(() => "?").join(",");
+        const permPlaceholders = permissionIds.map(() => "?").join(",");
+        const r = await db.run(
+          `DELETE FROM role_permission
+           WHERE role_id IN (${rolePlaceholders}) AND permission_id IN (${permPlaceholders})`,
+          ...roleIds,
+          ...permissionIds
+        );
+        return { action, roleIds, permissionIds, inserted: 0, deleted: r.changes || 0 };
+      });
+
+      ok(res, result);
+    } catch (e) {
+      fail(res, 400, e?.message || "Failed to bulk update role permissions");
+    }
+  }
+);
+
 export default router;
