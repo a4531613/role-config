@@ -41,6 +41,7 @@
         <div
           class="tree-table-row"
           style="--col-2: 160px; --col-3: 220px; --col-4: 80px; --col-5: 90px; --col-actions: 240px"
+          @contextmenu.prevent="openRowMenu($event, data)"
         >
           <div>
             <span :style="{ paddingLeft: `${(node.level - 1) * 16}px` }">{{ data.name }}</span>
@@ -64,6 +65,8 @@
         </div>
       </template>
     </el-tree>
+
+    <ContextMenu :open="ctx.open" :x="ctx.x" :y="ctx.y" :items="ctx.items" @close="ctx.close" />
 
     <EditDialog v-model="dialogOpen" :title="dialogTitle" :model="form" :saving="saving" @save="save">
       <el-form-item label="父级ID">
@@ -106,8 +109,10 @@ import { computed, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 import EditDialog from "../components/EditDialog.vue";
 import PageHeader from "../components/PageHeader.vue";
+import ContextMenu from "../components/ContextMenu.vue";
 import { buildTree } from "../utils/tree.js";
 import { useTreeSearch } from "../composables/useTreeSearch.js";
+import { useContextMenu } from "../composables/useContextMenu.js";
 import { useDataChanged } from "../composables/useDataChanged.js";
 import { delJson, getJson, postJson, putJson } from "../api.js";
 
@@ -317,4 +322,25 @@ async function onNodeDrop(draggingNode, dropNode, dropType) {
 
 refresh();
 useDataChanged(refresh);
+
+const ctx = useContextMenu();
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(String(text ?? ""));
+    ElMessage.success("已复制");
+  } catch {
+    ElMessage.error("复制失败");
+  }
+}
+
+function openRowMenu(e, row) {
+  ctx.show(e, [
+    { key: "addChild", label: "新增子菜单", onClick: () => openCreate(row.id) },
+    { key: "edit", label: "编辑", onClick: () => openEdit(row) },
+    { key: "copyCode", label: "复制 code", onClick: () => copyText(row.code) },
+    { key: "copyPath", label: "复制 path", disabled: !row.path, onClick: () => copyText(row.path) },
+    { key: "delete", label: "删除", danger: true, onClick: () => remove(row) },
+  ]);
+}
 </script>

@@ -16,11 +16,13 @@
 
         <el-table
           v-loading="loading"
+          ref="roleTableRef"
           :data="roles"
           row-key="id"
           highlight-current-row
           @current-change="selectRole"
           @selection-change="onSelectionChange"
+          @row-contextmenu="onRoleRowContextMenu"
         >
           <el-table-column v-if="bulkMode" type="selection" width="48" />
           <el-table-column prop="name" label="名称" />
@@ -126,7 +128,7 @@
                 :props="{ label: 'name', children: 'children' }"
               >
                 <template #default="{ data }">
-                  <span>{{ data.name }}</span>
+                  <span @contextmenu.prevent="openMenuNodeContext($event, data)">{{ data.name }}</span>
                   <span class="muted" style="margin-left: 8px">({{ data.code }})</span>
                 </template>
               </el-tree>
@@ -177,7 +179,7 @@
                 :props="{ label: 'name', children: 'children' }"
               >
                 <template #default="{ data }">
-                  <span>{{ data.name }}</span>
+                  <span @contextmenu.prevent="openPermNodeContext($event, data)">{{ data.name }}</span>
                   <span class="muted" style="margin-left: 8px">({{ data.level }} / {{ data.code }})</span>
                 </template>
               </el-tree>
@@ -186,6 +188,8 @@
         </template>
       </el-col>
     </el-row>
+
+    <ContextMenu :open="ctx.open" :x="ctx.x" :y="ctx.y" :items="ctx.items" @close="ctx.close" />
 
     <EditDialog
       v-model="dialogOpen"
@@ -217,9 +221,11 @@
 import { computed, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import EditDialog from "../components/EditDialog.vue";
+import ContextMenu from "../components/ContextMenu.vue";
 import { buildTree } from "../utils/tree.js";
 import { useTreeSearch } from "../composables/useTreeSearch.js";
 import { useDataChanged } from "../composables/useDataChanged.js";
+import { useContextMenu } from "../composables/useContextMenu.js";
 import { delJson, getJson, postJson, putJson } from "../api.js";
 
 const loading = ref(false);
@@ -236,6 +242,7 @@ const permTree = computed(() => buildTree(permissions.value));
 const currentRole = ref(null);
 const activeTab = ref("menus");
 
+const roleTableRef = ref(null);
 const menuTreeRef = ref(null);
 const permTreeRef = ref(null);
 
@@ -284,6 +291,17 @@ const {
 
 const checkedMenuCount = computed(() => (menuTreeRef.value?.getCheckedKeys(false) || []).length);
 const checkedPermCount = computed(() => (permTreeRef.value?.getCheckedKeys(false) || []).length);
+
+const ctx = useContextMenu();
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(String(text ?? ""));
+    ElMessage.success("已复制");
+  } catch {
+    ElMessage.error("复制失败");
+  }
+}
 
 function onSelectionChange(selection) {
   selectedRoleIds.value = (selection || []).map((r) => r.id);
@@ -426,6 +444,54 @@ async function saveBindings() {
   } finally {
     saving.value = false;
   }
+}
+
+function onRoleRowContextMenu(row, column, event) {
+  if (!row) return;
+  ctx.show(event, [
+    {
+      key: "select",
+      label: "进入绑定",
+      disabled: bulkMode.value,
+      onClick: () => selectRole(row),
+    },
+    { key: "edit", label: "编辑角色", onClick: () => openEditRole(row) },
+    { key: "copyCode", label: "复制 code", onClick: () => copyText(row.code) },
+    { key: "copyOwner", label: "复制 owner", disabled: !row.owner, onClick: () => copyText(row.owner) },
+    { key: "delete", label: "删除角色", danger: true, onClick: () => removeRole(row) },
+  ]);
+}
+
+function setCheckedSingle(treeRef, id, checked) {
+  const keys = treeRef.value?.getCheckedKeys(false) || [];
+  const set = new Set(keys);
+  if (checked) set.add(id);
+  else set.delete(id);
+  treeRef.value?.setCheckedKeys?.([...set], false);
+}
+
+function openMenuNodeContext(event, node) {
+  ctx.show(event, [
+    { key: "check", label: "勾选", onClick: () => setCheckedSingle(menuTreeRef, node.id, true) },
+    { key: "uncheck", label: "取消勾选", onClick: () => setCheckedSingle(menuTreeRef, node.id, false) },
+    { key: "only", label: "仅勾选此项", onClick: () => menuTreeRef.value?.setCheckedKeys?.([node.id], false) },
+    { key: "copyCode", label: "复制 code", onClick: () => copyText(node.code) },
+  ]);
+}
+
+function openPermNodeContext(event, node) {
+  ctx.show(event, [
+    { key: "check", label: "勾选", onClick: () => setCheckedSingle(permTreeRef, node.id, true) },
+    { key: "uncheck", label: "取消勾选", onClick: () => setCheckedSingle(permTreeRef, node.id, false) },
+    { key: "only", label: "仅勾选此项", onClick: () => permTreeRef.value?.setCheckedKeys?.([node.id], false) },
+    { key: "copyCode", label: "复制 code", onClick: () => copyText(node.code) },
+    {
+      key: "copyPath",
+      label: "复制 path",
+      disabled: node.level !== "method" || !node.path,
+      onClick: () => copyText(node.path),
+    },
+  ]);
 }
 
 async function bulkApplyMenus(action) {
