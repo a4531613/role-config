@@ -1,0 +1,17 @@
+{
+  "name": "role-config",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w web\"",
+    "start": "npm run start -w server",
+    "build": "npm run build -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
+
