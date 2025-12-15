@@ -18,6 +18,8 @@
 - 后端：`http://localhost:3001`
 - 前端：`http://localhost:5173`
 
+如果启动时报端口占用（`EADDRINUSE`），先关闭占用 `3001` 的旧 Node 进程，或改 `PORT` 后再启动。
+
 ## 数据库
 
 SQLite 文件默认在 `server/data/app.db`（首次启动自动建表）。

@@ -2,6 +2,7 @@ import express from "express";
 import { z } from "zod";
 import { getDb } from "../db.js";
 import { ok, fail } from "../http.js";
+import { withTransaction } from "../tx.js";
 import { parseBody, zId } from "../validate.js";
 
 const router = express.Router();
@@ -61,21 +62,21 @@ router.put("/reorder", parseBody(menuReorderSchema), async (req, res) => {
     return fail(res, 400, "All orderedIds must already have the given parentId");
   }
 
-  await db.exec("BEGIN");
   try {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await db.run(
-        `UPDATE menu
-         SET sort = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
-         WHERE id = ?`,
-        i * 10,
-        orderedIds[i]
-      );
-    }
-    await db.exec("COMMIT");
-    ok(res, { parentId, orderedIds });
+    const result = await withTransaction(db, async () => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await db.run(
+          `UPDATE menu
+           SET sort = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+           WHERE id = ?`,
+          i * 10,
+          orderedIds[i]
+        );
+      }
+      return { parentId, orderedIds };
+    });
+    ok(res, result);
   } catch (e) {
-    await db.exec("ROLLBACK");
     fail(res, 400, e?.message || "Failed to reorder menus");
   }
 });
@@ -84,38 +85,38 @@ router.post("/", parseBody(menuCreateSchema), async (req, res) => {
   const db = await getDb();
   const b = req.validatedBody;
   try {
-    await db.exec("BEGIN");
-    const result = await db.run(
-      `INSERT INTO menu (parent_id, name, code, path, icon, sort, enabled, updated_at)
-       VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
-      b.name,
-      b.code,
-      b.path ?? null,
-      b.icon ?? null,
-      b.sort ?? 0,
-      b.enabled ?? 1
-    );
-    const createdId = result.lastID;
-    if (b.parentId != null) {
-      if (b.parentId === createdId) throw new Error("parentId cannot be self");
-      const parent = await db.get("SELECT id FROM menu WHERE id = ?", b.parentId);
-      if (!parent) throw new Error("Parent menu not found");
-      await db.run(
-        `UPDATE menu
-         SET parent_id = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
-         WHERE id = ?`,
-        b.parentId,
-        createdId
+    const createdId = await withTransaction(db, async () => {
+      const result = await db.run(
+        `INSERT INTO menu (parent_id, name, code, path, icon, sort, enabled, updated_at)
+         VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+        b.name,
+        b.code,
+        b.path ?? null,
+        b.icon ?? null,
+        b.sort ?? 0,
+        b.enabled ?? 1
       );
-    }
-    await db.exec("COMMIT");
+      const id = result.lastID;
+      if (b.parentId != null) {
+        if (b.parentId === id) throw new Error("parentId cannot be self");
+        const parent = await db.get("SELECT id FROM menu WHERE id = ?", b.parentId);
+        if (!parent) throw new Error("Parent menu not found");
+        await db.run(
+          `UPDATE menu
+           SET parent_id = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+           WHERE id = ?`,
+          b.parentId,
+          id
+        );
+      }
+      return id;
+    });
     const created = await db.get(
       "SELECT id, parent_id as parentId, name, code, path, icon, sort, enabled, created_at as createdAt, updated_at as updatedAt FROM menu WHERE id = ?",
       createdId
     );
     ok(res, created);
   } catch (e) {
-    await db.exec("ROLLBACK");
     fail(res, 400, e?.message || "Failed to create menu");
   }
 });

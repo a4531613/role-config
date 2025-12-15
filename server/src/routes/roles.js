@@ -2,6 +2,7 @@ import express from "express";
 import { z } from "zod";
 import { getDb } from "../db.js";
 import { ok, fail } from "../http.js";
+import { withTransaction } from "../tx.js";
 import { parseBody, zId } from "../validate.js";
 
 const router = express.Router();
@@ -103,16 +104,16 @@ router.put("/:id/menus", parseBody(z.object({ menuIds: z.array(z.coerce.number()
   const db = await getDb();
   const { menuIds } = req.validatedBody;
 
-  await db.exec("BEGIN");
   try {
-    await db.run("DELETE FROM role_menu WHERE role_id = ?", roleId);
-    for (const menuId of menuIds) {
-      await db.run("INSERT INTO role_menu (role_id, menu_id) VALUES (?, ?)", roleId, menuId);
-    }
-    await db.exec("COMMIT");
-    ok(res, { roleId, menuIds });
+    const result = await withTransaction(db, async () => {
+      await db.run("DELETE FROM role_menu WHERE role_id = ?", roleId);
+      for (const menuId of menuIds) {
+        await db.run("INSERT INTO role_menu (role_id, menu_id) VALUES (?, ?)", roleId, menuId);
+      }
+      return { roleId, menuIds };
+    });
+    ok(res, result);
   } catch (e) {
-    await db.exec("ROLLBACK");
     fail(res, 400, e?.message || "Failed to update role menus");
   }
 });
@@ -135,24 +136,23 @@ router.put(
     const db = await getDb();
     const { permissionIds } = req.validatedBody;
 
-    await db.exec("BEGIN");
     try {
-      await db.run("DELETE FROM role_permission WHERE role_id = ?", roleId);
-      for (const permissionId of permissionIds) {
-        await db.run(
-          "INSERT INTO role_permission (role_id, permission_id) VALUES (?, ?)",
-          roleId,
-          permissionId
-        );
-      }
-      await db.exec("COMMIT");
-      ok(res, { roleId, permissionIds });
+      const result = await withTransaction(db, async () => {
+        await db.run("DELETE FROM role_permission WHERE role_id = ?", roleId);
+        for (const permissionId of permissionIds) {
+          await db.run(
+            "INSERT INTO role_permission (role_id, permission_id) VALUES (?, ?)",
+            roleId,
+            permissionId
+          );
+        }
+        return { roleId, permissionIds };
+      });
+      ok(res, result);
     } catch (e) {
-      await db.exec("ROLLBACK");
       fail(res, 400, e?.message || "Failed to update role permissions");
     }
   }
 );
 
 export default router;
-

@@ -3,6 +3,7 @@ import multer from "multer";
 import { z } from "zod";
 import { getDb } from "../db.js";
 import { ok, fail } from "../http.js";
+import { withTransaction } from "../tx.js";
 import { parseBody } from "../validate.js";
 
 const router = express.Router();
@@ -136,136 +137,133 @@ router.post(
     const db = await getDb();
     const p = parsed.data;
 
-    await db.exec("BEGIN");
     try {
-      if (p.menus?.length) {
-        for (const m of p.menus) {
-          await db.run(
-            `INSERT INTO menu (parent_id, name, code, path, icon, sort, enabled, updated_at)
-             VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-             ON CONFLICT(code) DO UPDATE SET
-               name=excluded.name, path=excluded.path, icon=excluded.icon,
-               sort=excluded.sort, enabled=excluded.enabled,
-               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
-            m.name,
-            m.code,
-            m.path ?? null,
-            m.icon ?? null,
-            m.sort ?? 0,
-            m.enabled ?? 1
+      await withTransaction(db, async () => {
+        if (p.menus?.length) {
+          for (const m of p.menus) {
+            await db.run(
+              `INSERT INTO menu (parent_id, name, code, path, icon, sort, enabled, updated_at)
+               VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+               ON CONFLICT(code) DO UPDATE SET
+                 name=excluded.name, path=excluded.path, icon=excluded.icon,
+                 sort=excluded.sort, enabled=excluded.enabled,
+                 updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+              m.name,
+              m.code,
+              m.path ?? null,
+              m.icon ?? null,
+              m.sort ?? 0,
+              m.enabled ?? 1
+            );
+          }
+          const menuMap = new Map(
+            (await db.all("SELECT id, code FROM menu")).map((r) => [r.code, r.id])
           );
+          for (const m of p.menus) {
+            const parentId = m.parentCode ? menuMap.get(m.parentCode) ?? null : null;
+            await db.run(
+              `UPDATE menu SET parent_id = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE code = ?`,
+              parentId,
+              m.code
+            );
+          }
         }
-        const menuMap = new Map(
+
+        if (p.permissions?.length) {
+          for (const perm of p.permissions) {
+            await db.run(
+              `INSERT INTO permission (parent_id, level, name, code, description, sort, enabled, updated_at)
+               VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+               ON CONFLICT(code) DO UPDATE SET
+                 level=excluded.level, name=excluded.name, description=excluded.description,
+                 sort=excluded.sort, enabled=excluded.enabled,
+                 updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+              perm.level,
+              perm.name,
+              perm.code,
+              perm.description ?? null,
+              perm.sort ?? 0,
+              perm.enabled ?? 1
+            );
+          }
+          const permMap = new Map(
+            (await db.all("SELECT id, code FROM permission")).map((r) => [r.code, r.id])
+          );
+          for (const perm of p.permissions) {
+            const parentId = perm.parentCode ? permMap.get(perm.parentCode) ?? null : null;
+            await db.run(
+              `UPDATE permission SET parent_id = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE code = ?`,
+              parentId,
+              perm.code
+            );
+          }
+        }
+
+        if (p.roles?.length) {
+          for (const r of p.roles) {
+            await db.run(
+              `INSERT INTO role (name, code, description, enabled, updated_at)
+               VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+               ON CONFLICT(code) DO UPDATE SET
+                 name=excluded.name, description=excluded.description, enabled=excluded.enabled,
+                 updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+              r.name,
+              r.code,
+              r.description ?? null,
+              r.enabled ?? 1
+            );
+          }
+        }
+
+        const roleMap = new Map(
+          (await db.all("SELECT id, code FROM role")).map((r) => [r.code, r.id])
+        );
+        const menuMap2 = new Map(
           (await db.all("SELECT id, code FROM menu")).map((r) => [r.code, r.id])
         );
-        for (const m of p.menus) {
-          const parentId = m.parentCode ? menuMap.get(m.parentCode) ?? null : null;
-          await db.run(
-            `UPDATE menu SET parent_id = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE code = ?`,
-            parentId,
-            m.code
-          );
-        }
-      }
-
-      if (p.permissions?.length) {
-        for (const perm of p.permissions) {
-          await db.run(
-            `INSERT INTO permission (parent_id, level, name, code, description, sort, enabled, updated_at)
-             VALUES (NULL, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-             ON CONFLICT(code) DO UPDATE SET
-               level=excluded.level, name=excluded.name, description=excluded.description,
-               sort=excluded.sort, enabled=excluded.enabled,
-               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
-            perm.level,
-            perm.name,
-            perm.code,
-            perm.description ?? null,
-            perm.sort ?? 0,
-            perm.enabled ?? 1
-          );
-        }
-        const permMap = new Map(
+        const permMap2 = new Map(
           (await db.all("SELECT id, code FROM permission")).map((r) => [r.code, r.id])
         );
-        for (const perm of p.permissions) {
-          const parentId = perm.parentCode ? permMap.get(perm.parentCode) ?? null : null;
-          await db.run(
-            `UPDATE permission SET parent_id = ?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE code = ?`,
-            parentId,
-            perm.code
-          );
-        }
-      }
 
-      if (p.roles?.length) {
-        for (const r of p.roles) {
-          await db.run(
-            `INSERT INTO role (name, code, description, enabled, updated_at)
-             VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-             ON CONFLICT(code) DO UPDATE SET
-               name=excluded.name, description=excluded.description, enabled=excluded.enabled,
-               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
-            r.name,
-            r.code,
-            r.description ?? null,
-            r.enabled ?? 1
-          );
+        if (p.roleMenus?.length) {
+          const roleCodes = [...new Set(p.roleMenus.map((x) => x.roleCode))];
+          for (const roleCode of roleCodes) {
+            const roleId = roleMap.get(roleCode);
+            if (!roleId) continue;
+            await db.run("DELETE FROM role_menu WHERE role_id = ?", roleId);
+          }
+          for (const rm of p.roleMenus) {
+            const roleId = roleMap.get(rm.roleCode);
+            const menuId = menuMap2.get(rm.menuCode);
+            if (!roleId || !menuId) continue;
+            await db.run("INSERT INTO role_menu (role_id, menu_id) VALUES (?, ?)", roleId, menuId);
+          }
         }
-      }
 
-      const roleMap = new Map(
-        (await db.all("SELECT id, code FROM role")).map((r) => [r.code, r.id])
-      );
-      const menuMap2 = new Map(
-        (await db.all("SELECT id, code FROM menu")).map((r) => [r.code, r.id])
-      );
-      const permMap2 = new Map(
-        (await db.all("SELECT id, code FROM permission")).map((r) => [r.code, r.id])
-      );
-
-      if (p.roleMenus?.length) {
-        const roleCodes = [...new Set(p.roleMenus.map((x) => x.roleCode))];
-        for (const roleCode of roleCodes) {
-          const roleId = roleMap.get(roleCode);
-          if (!roleId) continue;
-          await db.run("DELETE FROM role_menu WHERE role_id = ?", roleId);
+        if (p.rolePermissions?.length) {
+          const roleCodes = [...new Set(p.rolePermissions.map((x) => x.roleCode))];
+          for (const roleCode of roleCodes) {
+            const roleId = roleMap.get(roleCode);
+            if (!roleId) continue;
+            await db.run("DELETE FROM role_permission WHERE role_id = ?", roleId);
+          }
+          for (const rp of p.rolePermissions) {
+            const roleId = roleMap.get(rp.roleCode);
+            const permissionId = permMap2.get(rp.permissionCode);
+            if (!roleId || !permissionId) continue;
+            await db.run(
+              "INSERT INTO role_permission (role_id, permission_id) VALUES (?, ?)",
+              roleId,
+              permissionId
+            );
+          }
         }
-        for (const rm of p.roleMenus) {
-          const roleId = roleMap.get(rm.roleCode);
-          const menuId = menuMap2.get(rm.menuCode);
-          if (!roleId || !menuId) continue;
-          await db.run("INSERT INTO role_menu (role_id, menu_id) VALUES (?, ?)", roleId, menuId);
-        }
-      }
-
-      if (p.rolePermissions?.length) {
-        const roleCodes = [...new Set(p.rolePermissions.map((x) => x.roleCode))];
-        for (const roleCode of roleCodes) {
-          const roleId = roleMap.get(roleCode);
-          if (!roleId) continue;
-          await db.run("DELETE FROM role_permission WHERE role_id = ?", roleId);
-        }
-        for (const rp of p.rolePermissions) {
-          const roleId = roleMap.get(rp.roleCode);
-          const permissionId = permMap2.get(rp.permissionCode);
-          if (!roleId || !permissionId) continue;
-          await db.run(
-            "INSERT INTO role_permission (role_id, permission_id) VALUES (?, ?)",
-            roleId,
-            permissionId
-          );
-        }
-      }
-
-      await db.exec("COMMIT");
+      });
       ok(res, { imported: true });
     } catch (e) {
-      await db.exec("ROLLBACK");
       fail(res, 400, e?.message || "Import failed");
     }
   }
 );
 
 export default router;
-

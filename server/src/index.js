@@ -1,3 +1,4 @@
+import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -24,14 +25,35 @@ app.use("/api/roles", rolesRouter);
 app.use("/api", transferRouter);
 
 app.use((err, req, res, next) => {
+  const isZodError = err?.name === "ZodError";
+  const status = isZodError ? 400 : 500;
+  const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
   // eslint-disable-next-line no-console
   console.error(err);
-  res.status(500).json({ ok: false, message: "Internal Server Error" });
+  res.status(status).json({
+    ok: false,
+    message: isZodError ? "Invalid request" : "Internal Server Error",
+    details: isZodError
+      ? err.flatten?.()
+      : isProd
+        ? undefined
+        : {
+            name: err?.name,
+            message: err?.message,
+            code: err?.code,
+            stack: err?.stack,
+          },
+  });
 });
 
 const port = Number(process.env.PORT || 3001);
-app.listen(port, () => {
+const server = app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`[server] listening on http://localhost:${port}`);
 });
 
+server.on("error", (err) => {
+  // eslint-disable-next-line no-console
+  console.error(`[server] listen error on port ${port}:`, err);
+  process.exit(1);
+});

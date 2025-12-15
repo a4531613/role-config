@@ -17,6 +17,35 @@ async function migrate(db) {
   await db.exec(schemaSql);
 }
 
+async function assertTableColumns(db, table, requiredColumns) {
+  const cols = await db.all(`PRAGMA table_info(${table})`);
+  const names = new Set(cols.map((c) => c.name));
+  const missing = requiredColumns.filter((c) => !names.has(c));
+  if (missing.length) {
+    throw new Error(
+      `SQLite schema mismatch: table "${table}" missing columns: ${missing.join(
+        ", "
+      )}. If this is a dev environment, delete the DB file and restart.`
+    );
+  }
+}
+
+async function validateSchema(db) {
+  await assertTableColumns(db, "menu", ["id", "parent_id", "name", "code", "sort", "enabled"]);
+  await assertTableColumns(db, "permission", [
+    "id",
+    "parent_id",
+    "level",
+    "name",
+    "code",
+    "sort",
+    "enabled",
+  ]);
+  await assertTableColumns(db, "role", ["id", "name", "code", "enabled"]);
+  await assertTableColumns(db, "role_menu", ["role_id", "menu_id"]);
+  await assertTableColumns(db, "role_permission", ["role_id", "permission_id"]);
+}
+
 export async function getDb() {
   if (dbPromise) return dbPromise;
   dbPromise = (async () => {
@@ -28,8 +57,8 @@ export async function getDb() {
     });
     await db.exec("PRAGMA foreign_keys = ON;");
     await migrate(db);
+    await validateSchema(db);
     return db;
   })();
   return dbPromise;
 }
-
